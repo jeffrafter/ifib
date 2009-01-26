@@ -5,6 +5,7 @@ require 'memcache'
 CACHE = MemCache.new 'localhost:11211', :namespace => 'fib'
 CACHE.set(0, 0)
 CACHE.set(1, 1)
+CACHE.set('max', 1)
 
 get '/' do
   haml :index
@@ -18,13 +19,23 @@ end
 def fib(n)
   CACHE.get(n) || begin
     return n if (0..1).include? n
+    return generate(n)
+  end
+end
 
-    n_1 = CACHE.get(n - 1) || fib(n - 1)
-    n_2 = CACHE.get(n - 2) || fib(n - 2)
-
-    result = n_1 + n_2
-    CACHE.add(n, result)
-    result
+def generate(offset)
+  CACHE.get(offset) || begin
+    max = CACHE.get('max')
+    a, b = CACHE.get(max - 1), CACHE.get(max)
+    c = nil
+    max.upto(offset) do |key|
+      c = a + b
+      a = b
+      b = c
+      CACHE.set(key, b)
+    end
+    CACHE.set('max', offset)
+    return b
   end
 end
 
@@ -59,3 +70,4 @@ __END__
 %p Example:
 %blockquote
   %pre $ curl http://localhost:4567/api/v1/fibonacci/119
+
